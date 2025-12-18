@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Waktu Solat Labuan</title>
 <style>
+/* CSS STYLE - DIUBAHSUAI UNTUK KOMPAS BERPUSING */
 :root{--accent:#F1C40F;--radius:14px}
 *{box-sizing:border-box}
 body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f6fa;color:#081124;display:flex;justify-content:center}
@@ -16,9 +17,11 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
 .controls{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap;justify-content:center}
 .btn{padding:10px 14px;border-radius:12px;border:none;background:var(--accent);font-weight:700;cursor:pointer;color:#000}
 .btn.ghost{background:#eef2f7;color:#333}
+.dark .btn.ghost{background:#111; color:#eee;}
 .card{margin-top:14px;background:#fff;border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,.05)}
 .dark .card{background:#081122}
 .item{display:flex;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #eee}
+.dark .item{border-bottom:1px solid #1a243a}
 .item:last-child{border-bottom:none}
 .prayer{font-weight:800;color:var(--accent)}
 .countdown{margin-top:12px;padding:12px;border-radius:12px;background:#fff;display:flex;justify-content:space-between}
@@ -28,7 +31,8 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
 
 #qiblaBox{display:none;padding:14px;text-align:center}
 #manualBox{display:none;margin-top:10px;padding:10px;background:#f8f9fa;border-radius:8px}
-#permBtn{display:none; margin:10px auto; background:#e74c3c; color:white;}
+.dark #manualBox{background:#1a243a;}
+#permBtn{display:none; margin:10px auto; background:#e74c3c; color:white; width: 80%;}
 
 /* Style untuk Kompas */
 .compass-container {
@@ -83,26 +87,27 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
     
     <div class="compass-container">
       <svg width="220" height="220" viewBox="0 0 100 100">
+        
         <polygon points="50,2 47,8 53,8" fill="#e74c3c" />
         
         <g id="compassFace" transform="rotate(0, 50, 50)">
-          <circle cx="50" cy="50" r="40" fill="none" stroke="#ddd" stroke-width="2" />
+          <circle cx="50" cy="50" r="40" fill="none" stroke="#ddd" stroke-width="4" />
           
-          <text x="50" y="18" text-anchor="middle" font-size="5" font-weight="bold" fill="#333">N</text>
-          <text x="85" y="52" text-anchor="middle" font-size="4" fill="#999">E</text>
-          <text x="50" y="86" text-anchor="middle" font-size="4" fill="#999">S</text>
-          <text x="15" y="52" text-anchor="middle" font-size="4" fill="#999">W</text>
+          <text x="50" y="18" text-anchor="middle" font-size="5" font-weight="bold" fill="currentColor">N</text>
+          <text x="85" y="52" text-anchor="middle" font-size="4" fill="currentColor">E</text>
+          <text x="50" y="86" text-anchor="middle" font-size="4" fill="currentColor">S</text>
+          <text x="15" y="52" text-anchor="middle" font-size="4" fill="currentColor">W</text>
           
-          <circle cx="50" cy="50" r="2" fill="#333" />
+          <circle cx="50" cy="50" r="2" fill="currentColor" />
           
           <g id="arrowGroup">
-             <line x1="50" y1="50" x2="50" y2="15" stroke="#F1C40F" stroke-width="4" stroke-linecap="round" />
+             <line x1="50" y1="50" x2="50" y2="15" stroke="#F1C40F" stroke-width="6" stroke-linecap="round" />
              <text x="50" y="25" text-anchor="middle" font-size="3" fill="#555" font-weight="bold">KAABAH</text>
           </g>
         </g>
       </svg>
     </div>
-    <small style="display:block; margin-top:-10px; color:#666">Pusingkan badan hingga jarum kuning bertemu segitiga merah</small>
+    <small style="display:block; margin-top:-10px; color:#666">Pusingkan badan hingga jarum kuning selari dengan segitiga merah</small>
 
     <div class="controls">
       <button class="btn ghost" id="btnManual">Manual</button>
@@ -144,6 +149,7 @@ function init(){
     .then(r => r.json())
     .then(d => {
       const now = new Date();
+      // Cari data dalam senarai API yang tarikhnya sama dengan hari ini
       today = d.prayers.find(p => {
         const pDate = new Date(p.fajr * 1000); 
         return pDate.getDate() === now.getDate() && 
@@ -173,8 +179,10 @@ function renderList(){
   const list = document.getElementById('list');
   list.innerHTML = '';
   ORDER.forEach(k => {
+    // Tukar timestamp ke format jam (contoh: 05:45 PG)
     const t = new Date(today[k]*1000).toLocaleTimeString('ms-MY', {hour:'2-digit', minute:'2-digit'});
-    list.innerHTML += `<div class="item"><div class="prayer">${NAME[k]}</div><div>${t}</div></div>`;
+    const period = new Date(today[k]*1000).getHours() < 12 ? 'PG' : 'PTG';
+    list.innerHTML += `<div class="item"><div class="prayer">${NAME[k]}</div><div>${t.replace(/\s[A-Za-z]+/, '')} ${period}</div></div>`;
   });
 }
 
@@ -193,7 +201,10 @@ function setupCountdown(){
 
   document.getElementById('countdown').style.display = 'flex';
   document.getElementById('nextName').innerText = NAME[nextKey];
-  document.getElementById('nextTime').innerText = new Date(nextTs).toLocaleTimeString('ms-MY', {hour:'2-digit', minute:'2-digit'});
+  const nextTimeDate = new Date(nextTs);
+  const nextTimeStr = nextTimeDate.toLocaleTimeString('ms-MY', {hour:'2-digit', minute:'2-digit'});
+  const nextPeriod = nextTimeDate.getHours() < 12 ? 'PG' : 'PTG';
+  document.getElementById('nextTime').innerText = nextTimeStr.replace(/\s[A-Za-z]+/, '') + ' ' + nextPeriod;
 
   timerInt = setInterval(() => {
     const r = nextTs - Date.now();
@@ -256,7 +267,7 @@ function requestSensorPermission() {
           document.getElementById('permBtn').style.display = 'none';
           window.addEventListener('deviceorientation', handleOrientation, true);
         } else {
-          alert('Izin ditolak.');
+          alert('Izin ditolak. Kompas tidak dapat berfungsi.');
         }
       })
       .catch(console.error);
@@ -265,11 +276,12 @@ function requestSensorPermission() {
 
 function handleOrientation(e) {
   // Dapatkan arah mana phone menghadap (0 = Utara)
-  let compass = e.webkitCompassHeading || Math.abs(e.alpha - 360);
+  let compass = e.webkitCompassHeading || e.alpha; // Gunakan e.alpha jika webkitCompassHeading tiada
   
-  if(compass) {
+  if (compass != null) {
      // Kita pusingkan SATU PIRING (huruf N, E, W, S + Jarum) melawan arah phone
      // Supaya 'N' sentiasa tunjuk utara sebenar di skrin
+     // -compass sebab nak piring berpusing songsang dengan putaran phone
      document.getElementById('compassFace').setAttribute('transform', `rotate(${-compass} 50 50)`);
   }
 }
@@ -289,11 +301,10 @@ async function renderHijri(){
     const q = `${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()}`;
     const r = await fetch(`https://api.aladhan.com/v1/gToH?date=${q}`);
     const j = await r.json();
-    document.getElementById('hijri').innerText = j.data.hijri.date;
+    document.getElementById('hijri').innerText = 'Hijri: ' + j.data.hijri.date;
   }catch(e){}
 }
 </script>
 </body>
-</html>
-
-  
+    </html>
+      
