@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Waktu Solat Labuan</title>
 <style>
-/* CSS STYLE - DIUBAHSUAI UNTUK KOMPAS BERPUSING */
+/* CSS STYLE - DIUBAHSUAI UNTUK KOMPAS JARUM PUSING */
 :root{--accent:#F1C40F;--radius:14px}
 *{box-sizing:border-box}
 body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f6fa;color:#081124;display:flex;justify-content:center}
@@ -40,6 +40,11 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
     width: 220px;
     height: 220px;
     margin: 10px auto;
+}
+.compass-face {
+    position: relative;
+    width: 100%;
+    height: 100%;
 }
 </style>
 </head>
@@ -88,33 +93,36 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
     <div class="compass-container">
       <svg width="220" height="220" viewBox="0 0 100 100">
         
-        <polygon points="50,2 47,8 53,8" fill="#e74c3c" />
-        
-        <g id="compassFace" transform="rotate(0, 50, 50)">
+        <g id="compassFace">
           <circle cx="50" cy="50" r="40" fill="none" stroke="#ddd" stroke-width="4" />
           
-          <text x="50" y="18" text-anchor="middle" font-size="5" font-weight="bold" fill="currentColor">N</text>
+          <text x="50" y="18" text-anchor="middle" font-size="5" font-weight="bold" fill="#e74c3c">N</text>
           <text x="85" y="52" text-anchor="middle" font-size="4" fill="currentColor">E</text>
           <text x="50" y="86" text-anchor="middle" font-size="4" fill="currentColor">S</text>
           <text x="15" y="52" text-anchor="middle" font-size="4" fill="currentColor">W</text>
           
           <circle cx="50" cy="50" r="2" fill="currentColor" />
-          
-          <g id="arrowGroup">
-             <line x1="50" y1="50" x2="50" y2="15" stroke="#F1C40F" stroke-width="6" stroke-linecap="round" />
-             <text x="50" y="25" text-anchor="middle" font-size="3" fill="#555" font-weight="bold">KAABAH</text>
-          </g>
+        </g>
+        
+        <g id="needleGroup">
+            <line id="northNeedle" x1="50" y1="50" x2="50" y2="10" stroke="#e74c3c" stroke-width="3" stroke-linecap="round" />
+            <line x1="50" y1="50" x2="50" y2="90" stroke="#333" stroke-width="3" stroke-linecap="round" />
+            
+            <g id="qiblaPointer" transform="rotate(0 50 50)"> 
+                <line x1="50" y1="50" x2="50" y2="15" stroke="#F1C40F" stroke-width="6" stroke-linecap="round" />
+                <text x="50" y="25" text-anchor="middle" font-size="3" fill="#555" font-weight="bold">KAABAH</text>
+            </g>
         </g>
       </svg>
     </div>
-    <small style="display:block; margin-top:-10px; color:#666">Pusingkan badan hingga jarum kuning selari dengan segitiga merah</small>
+    <small style="display:block; margin-top:-10px; color:#666">Pusingkan phone sehingga jarum kuning bertemu jarum merah (Utara)</small>
 
     <div class="controls">
       <button class="btn ghost" id="btnManual">Manual</button>
     </div>
 
     <div id="manualBox">
-      <small>Letakkan phone rata. Pusing phone sampai kompas tunjuk 0° (Utara), arah Kaabah ialah:</small>
+      <small>Letakkan phone rata. Arah Kaabah ialah:</small>
       <div id="manualDegree" style="font-weight:900;font-size:20px; color:#F1C40F; margin-top:5px">—°</div>
     </div>
   </div>
@@ -149,7 +157,6 @@ function init(){
     .then(r => r.json())
     .then(d => {
       const now = new Date();
-      // Cari data dalam senarai API yang tarikhnya sama dengan hari ini
       today = d.prayers.find(p => {
         const pDate = new Date(p.fajr * 1000); 
         return pDate.getDate() === now.getDate() && 
@@ -179,7 +186,6 @@ function renderList(){
   const list = document.getElementById('list');
   list.innerHTML = '';
   ORDER.forEach(k => {
-    // Tukar timestamp ke format jam (contoh: 05:45 PG)
     const t = new Date(today[k]*1000).toLocaleTimeString('ms-MY', {hour:'2-digit', minute:'2-digit'});
     const period = new Date(today[k]*1000).getHours() < 12 ? 'PG' : 'PTG';
     list.innerHTML += `<div class="item"><div class="prayer">${NAME[k]}</div><div>${t.replace(/\s[A-Za-z]+/, '')} ${period}</div></div>`;
@@ -226,7 +232,7 @@ function format(ms){
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
 
-/* ===== QIBLAT ENGINE (PIRING PUSING) ===== */
+/* ===== QIBLAT ENGINE (JARUM PUSING) ===== */
 const KAABA_LAT = 21.422487, KAABA_LON = 39.826206;
 
 function toggleQibla(){
@@ -246,8 +252,9 @@ function startLocation(){
     document.getElementById('qiblaAngle').innerText = `Arah Kiblat: ${qiblaBearing.toFixed(1)}°`;
     document.getElementById('manualDegree').innerText = `${qiblaBearing.toFixed(1)}°`;
     
-    // Set jarum kuning ke arah kiblat pada piring (sekali sahaja)
-    document.getElementById('arrowGroup').setAttribute('transform', `rotate(${qiblaBearing} 50 50)`);
+    // Set jarum kuning ke arah kiblat relatif kepada Utara (statik atas piring)
+    // -90 to center the text above the needle
+    document.getElementById('qiblaPointer').setAttribute('transform', `rotate(${qiblaBearing} 50 50)`);
 
     // Setup permission
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -276,13 +283,13 @@ function requestSensorPermission() {
 
 function handleOrientation(e) {
   // Dapatkan arah mana phone menghadap (0 = Utara)
-  let compass = e.webkitCompassHeading || e.alpha; // Gunakan e.alpha jika webkitCompassHeading tiada
+  let compass = e.webkitCompassHeading || e.alpha; 
   
   if (compass != null) {
-     // Kita pusingkan SATU PIRING (huruf N, E, W, S + Jarum) melawan arah phone
-     // Supaya 'N' sentiasa tunjuk utara sebenar di skrin
-     // -compass sebab nak piring berpusing songsang dengan putaran phone
-     document.getElementById('compassFace').setAttribute('transform', `rotate(${-compass} 50 50)`);
+     // Kita pusingkan KESELURUHAN JARUM (Utara + Kiblat) melawan arah Utara telefon
+     // Jarum Utara akan tunjuk Utara yang betul
+     // Jarum Kiblat akan sentiasa mengekalkan sudut yang betul dari Utara
+     document.getElementById('needleGroup').setAttribute('transform', `rotate(${-compass} 50 50)`);
   }
 }
 
@@ -306,5 +313,4 @@ async function renderHijri(){
 }
 </script>
 </body>
-    </html>
-      
+</html>
