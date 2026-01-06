@@ -27,6 +27,28 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
 .timer{font-size:20px;font-weight:900}
 .footer{margin-top:14px;font-size:12px;color:#64748b;text-align:center}
 #notifBtn{background:#27ae60;color:white}
+
+/* === UPGRADE UI === */
+.selectBox{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  justify-content:center;
+  margin-top:8px
+}
+.selectBox label{
+  background:#eef2f7;
+  padding:6px 10px;
+  border-radius:10px;
+  font-size:13px;
+  cursor:pointer
+}
+.selectBox input:checked + span{
+  background:#27ae60;
+  color:white;
+  padding:6px 10px;
+  border-radius:10px
+}
 </style>
 </head>
 
@@ -46,6 +68,15 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
   <button class="btn ghost" id="darkBtn">Dark</button>
   <button class="btn" id="notifBtn">🔔 Notifikasi</button>
   <button class="btn ghost" id="notifToggle">OFF</button>
+</div>
+
+<!-- PILIH SOLAT -->
+<div class="selectBox" id="prayerSelect">
+  <label><input type="checkbox" value="fajr"><span>Subuh</span></label>
+  <label><input type="checkbox" value="dhuhr"><span>Zohor</span></label>
+  <label><input type="checkbox" value="asr"><span>Asar</span></label>
+  <label><input type="checkbox" value="maghrib"><span>Maghrib</span></label>
+  <label><input type="checkbox" value="isha"><span>Isyak</span></label>
 </div>
 
 <div id="zone" style="text-align:center;font-weight:bold">Menentukan lokasi…</div>
@@ -71,19 +102,19 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
 </div>
 
 <script>
-/* ===== CONFIG ===== */
+/* ===== CONFIG ASAL ===== */
 const ZONE='WLY02';
 const API='https://api.waktusolat.app/v2/solat/';
 const ORDER=['fajr','syuruk','dhuhr','asr','maghrib','isha'];
 const NAME={fajr:'Subuh',syuruk:'Syuruk',dhuhr:'Zohor',asr:'Asar',maghrib:'Maghrib',isha:'Isyak'};
 let today,nextTs,nextKey,timerInt;
 
-/* ===== INIT ===== */
+/* ===== INIT ASAL ===== */
 init();
 refresh.onclick=init;
 darkBtn.onclick=()=>document.body.classList.toggle('dark');
 
-/* ===== FETCH ===== */
+/* ===== FETCH ASAL ===== */
 function init(){
 fetch(API+ZONE).then(r=>r.json()).then(d=>{
 const now=new Date();
@@ -114,7 +145,7 @@ countdown.style.display='flex';
 nextName.innerText=NAME[nextKey];
 nextTime.innerText=new Date(nextTs).toLocaleTimeString('ms-MY',{hour:'2-digit',minute:'2-digit'});
 
-if(notifEnabled){
+if(notifEnabled && isPrayerSelected(nextKey)){
  scheduleNotification();
  scheduleAzanExact();
 }
@@ -145,9 +176,21 @@ hijri.innerText=j.data.hijri.date;
 }catch(e){}
 }
 
-/* ===== NOTIFICATION SYSTEM ===== */
+/* ===== NOTIFICATION UPGRADE ===== */
 let notifEnabled = localStorage.getItem("notif")==="on";
 let notifTimeout=null;
+
+/* solat pilihan */
+let selectedPrayers = JSON.parse(localStorage.getItem("prayers")) || ["fajr","dhuhr","asr","maghrib","isha"];
+
+/* restore checkbox */
+document.querySelectorAll("#prayerSelect input").forEach(cb=>{
+ cb.checked = selectedPrayers.includes(cb.value);
+ cb.onchange = ()=>{
+   selectedPrayers = [...document.querySelectorAll("#prayerSelect input:checked")].map(i=>i.value);
+   localStorage.setItem("prayers",JSON.stringify(selectedPrayers));
+ };
+});
 
 updateToggleUI();
 
@@ -158,8 +201,6 @@ Notification.requestPermission().then(p=>{
    notifEnabled=true;
    localStorage.setItem("notif","on");
    updateToggleUI();
-   scheduleNotification();
-   scheduleAzanExact();
  }
 });
 };
@@ -168,7 +209,6 @@ notifToggle.onclick=()=>{
 notifEnabled=!notifEnabled;
 localStorage.setItem("notif",notifEnabled?"on":"off");
 updateToggleUI();
-if(!notifEnabled) clearTimeout(notifTimeout);
 };
 
 function updateToggleUI(){
@@ -177,21 +217,27 @@ notifToggle.style.background=notifEnabled?"#27ae60":"#ccc";
 notifToggle.style.color=notifEnabled?"#fff":"#000";
 }
 
-/* 5 minit sebelum */
+function isPrayerSelected(key){
+ return selectedPrayers.includes(key);
+}
+
+/* 5 min sebelum + vibrate */
 function scheduleNotification(){
 clearTimeout(notifTimeout);
 const t=nextTs-(5*60*1000)-Date.now();
 if(t<=0)return;
 notifTimeout=setTimeout(()=>{
+ navigator.vibrate?.([200,100,200]);
  new Notification("Waktu Solat Hampir",{body:`${NAME[nextKey]} 5 minit lagi`});
 },t);
 }
 
-/* Tepat azan */
+/* Tepat azan + vibrate */
 function scheduleAzanExact(){
 const t=nextTs-Date.now();
 if(t<=0)return;
 setTimeout(()=>{
+ navigator.vibrate?.([300,150,300,150,300]);
  new Notification("🕌 Masuk Waktu Solat",{body:`Sekarang masuk waktu ${NAME[nextKey]}`});
 },t);
 }
