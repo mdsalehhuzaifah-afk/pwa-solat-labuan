@@ -26,10 +26,6 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
 .dark .countdown{background:#081122}
 .timer{font-size:20px;font-weight:900}
 .footer{margin-top:14px;font-size:12px;color:#64748b;text-align:center}
-
-#qiblaBox{display:none;padding:14px;text-align:center}
-#manualBox{display:none;margin-top:10px;padding:10px;background:#f8f9fa;border-radius:8px}
-#permBtn{display:none; margin:10px auto; background:#e74c3c; color:white;}
 #notifBtn{background:#27ae60;color:white}
 </style>
 </head>
@@ -37,51 +33,41 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
 <body>
 <div class="app">
 
-  <div class="header">
-    <div class="logo">م</div>
-    <div>
-      <h2>Waktu Solat Labuan</h2>
-      <small id="hijri">Memuatkan...</small>
-    </div>
+<div class="header">
+  <div class="logo">م</div>
+  <div>
+    <h2>Waktu Solat Labuan</h2>
+    <small id="hijri">Memuatkan...</small>
   </div>
+</div>
 
-  <div class="controls">
-    <button class="btn ghost" id="btnQibla">Kiblat</button>
-    <button class="btn" id="refresh">Refresh</button>
-    <button class="btn ghost" id="darkBtn">Dark</button>
-    <button class="btn" id="notifBtn">🔔 Notifikasi</button>
+<div class="controls">
+  <button class="btn" id="refresh">Refresh</button>
+  <button class="btn ghost" id="darkBtn">Dark</button>
+  <button class="btn" id="notifBtn">🔔 Notifikasi</button>
+  <button class="btn ghost" id="notifToggle">OFF</button>
+</div>
+
+<div id="zone" style="text-align:center;font-weight:bold">Menentukan lokasi…</div>
+<div id="date" style="text-align:center;color:#666"></div>
+
+<div class="card" id="list">
+  <div style="padding:20px;text-align:center">Sila tunggu...</div>
+</div>
+
+<div class="countdown" id="countdown" style="display:none">
+  <div>
+    <div id="nextName"></div>
+    <small id="nextTime"></small>
   </div>
+  <div class="timer" id="timer">00:00:00</div>
+</div>
 
-  <div id="zone" style="text-align:center;font-weight:bold">Menentukan lokasi…</div>
-  <div id="date" style="text-align:center;color:#666"></div>
+<audio id="azan" preload="auto">
+  <source src="https://www.muslimcentral.com/wp-content/uploads/adhan.mp3" type="audio/mpeg">
+</audio>
 
-  <div class="card" id="list">
-    <div style="padding:20px;text-align:center">Sila tunggu...</div>
-  </div>
-
-  <div class="countdown" id="countdown" style="display:none">
-    <div>
-      <div id="nextName"></div>
-      <small id="nextTime"></small>
-    </div>
-    <div class="timer" id="timer">00:00:00</div>
-  </div>
-
-  <audio id="azan" preload="auto">
-    <source src="https://www.muslimcentral.com/wp-content/uploads/adhan.mp3" type="audio/mpeg">
-  </audio>
-
-  <div id="qiblaBox" class="card">
-    <h3>🧭 Arah Kiblat</h3>
-    <button id="permBtn" class="btn">Benarkan Kompas</button>
-    <div id="qiblaAngle" style="font-weight:800">—</div>
-    <svg width="200" height="200" viewBox="0 0 100 100">
-      <circle cx="50" cy="50" r="46" fill="none" stroke="#ddd" stroke-width="2"/>
-      <line id="qiblaArrow" x1="50" y1="50" x2="50" y2="10" stroke="#F1C40F" stroke-width="5"/>
-    </svg>
-  </div>
-
-  <div class="footer">PWA – Labuan (WLY02)</div>
+<div class="footer">PWA – Labuan (WLY02)</div>
 </div>
 
 <script>
@@ -94,17 +80,16 @@ let today,nextTs,nextKey,timerInt;
 
 /* ===== INIT ===== */
 init();
-document.getElementById('refresh').onclick=init;
-document.getElementById('darkBtn').onclick=()=>document.body.classList.toggle('dark');
-document.getElementById('btnQibla').onclick=()=>document.getElementById('qiblaBox').style.display='block';
+refresh.onclick=init;
+darkBtn.onclick=()=>document.body.classList.toggle('dark');
 
 /* ===== FETCH ===== */
 function init(){
 fetch(API+ZONE).then(r=>r.json()).then(d=>{
 const now=new Date();
 today=d.prayers.find(p=>new Date(p.fajr*1000).getDate()===now.getDate());
-document.getElementById('zone').innerText='Zon: '+d.zone;
-document.getElementById('date').innerText=now.toLocaleDateString('ms-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+zone.innerText='Zon: '+d.zone;
+date.innerText=now.toLocaleDateString('ms-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 renderList();setupCountdown();renderHijri();
 });
 }
@@ -120,17 +105,28 @@ list.innerHTML+=`<div class="item"><div class="prayer">${NAME[k]}</div><div>${t}
 function setupCountdown(){
 clearInterval(timerInt);
 const now=Date.now();
-for(const k of ORDER){if(today[k]*1000>now){nextKey=k;nextTs=today[k]*1000;break;}}
+for(const k of ORDER){
+ if(today[k]*1000>now){nextKey=k;nextTs=today[k]*1000;break;}
+}
 if(!nextTs)return;
+
 countdown.style.display='flex';
 nextName.innerText=NAME[nextKey];
 nextTime.innerText=new Date(nextTs).toLocaleTimeString('ms-MY',{hour:'2-digit',minute:'2-digit'});
-if(notifEnabled) scheduleNotification();
+
+if(notifEnabled){
+ scheduleNotification();
+ scheduleAzanExact();
+}
 
 timerInt=setInterval(()=>{
-const r=nextTs-Date.now();
-if(r<=0){azan.play().catch(()=>{});init();return;}
-timer.innerText=format(r);
+ const r=nextTs-Date.now();
+ if(r<=0){
+   azan.play().catch(()=>{});
+   init();
+   return;
+ }
+ timer.innerText=format(r);
 },1000);
 }
 
@@ -149,23 +145,57 @@ hijri.innerText=j.data.hijri.date;
 }catch(e){}
 }
 
-/* ===== NOTIFICATION ===== */
-let notifEnabled=false,notifTimeout=null;
+/* ===== NOTIFICATION SYSTEM ===== */
+let notifEnabled = localStorage.getItem("notif")==="on";
+let notifTimeout=null;
+
+updateToggleUI();
+
 notifBtn.onclick=()=>{
-if(!('Notification'in window))return alert("Tak sokong notifikasi");
+if(!("Notification"in window))return alert("Browser tak sokong notifikasi");
 Notification.requestPermission().then(p=>{
-if(p==='granted'){notifEnabled=true;scheduleNotification();alert("Notifikasi ON");}
+ if(p==="granted"){
+   notifEnabled=true;
+   localStorage.setItem("notif","on");
+   updateToggleUI();
+   scheduleNotification();
+   scheduleAzanExact();
+ }
 });
 };
 
+notifToggle.onclick=()=>{
+notifEnabled=!notifEnabled;
+localStorage.setItem("notif",notifEnabled?"on":"off");
+updateToggleUI();
+if(!notifEnabled) clearTimeout(notifTimeout);
+};
+
+function updateToggleUI(){
+notifToggle.innerText=notifEnabled?"ON":"OFF";
+notifToggle.style.background=notifEnabled?"#27ae60":"#ccc";
+notifToggle.style.color=notifEnabled?"#fff":"#000";
+}
+
+/* 5 minit sebelum */
 function scheduleNotification(){
 clearTimeout(notifTimeout);
 const t=nextTs-(5*60*1000)-Date.now();
 if(t<=0)return;
 notifTimeout=setTimeout(()=>{
-new Notification("Waktu Solat Hampir",{body:`${NAME[nextKey]} 5 minit lagi`});
+ new Notification("Waktu Solat Hampir",{body:`${NAME[nextKey]} 5 minit lagi`});
+},t);
+}
+
+/* Tepat azan */
+function scheduleAzanExact(){
+const t=nextTs-Date.now();
+if(t<=0)return;
+setTimeout(()=>{
+ new Notification("🕌 Masuk Waktu Solat",{body:`Sekarang masuk waktu ${NAME[nextKey]}`});
 },t);
 }
 </script>
+
 </body>
 </html>
