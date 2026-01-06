@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Waktu Solat Labuan</title>
-
 <style>
 :root{--accent:#F1C40F;--radius:14px}
 *{box-sizing:border-box}
@@ -26,29 +25,16 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
 .dark .countdown{background:#081122}
 .timer{font-size:20px;font-weight:900}
 .footer{margin-top:14px;font-size:12px;color:#64748b;text-align:center}
+
+#qiblaBox{display:none;padding:14px;text-align:center}
+#manualBox{display:none;margin-top:10px;padding:10px;background:#f8f9fa;border-radius:8px}
+#permBtn{display:none;margin:10px auto;background:#e74c3c;color:white}
 #notifBtn{background:#27ae60;color:white}
 
-/* === UPGRADE UI === */
-.selectBox{
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-  justify-content:center;
-  margin-top:8px
-}
-.selectBox label{
-  background:#eef2f7;
-  padding:6px 10px;
-  border-radius:10px;
-  font-size:13px;
-  cursor:pointer
-}
-.selectBox input:checked + span{
-  background:#27ae60;
-  color:white;
-  padding:6px 10px;
-  border-radius:10px
-}
+/* pilih solat */
+.selectBox{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:10px 0}
+.selectBox label{background:#eef2f7;padding:6px 10px;border-radius:10px;font-size:13px;cursor:pointer}
+.selectBox input:checked+span{background:#27ae60;color:#fff;padding:6px 10px;border-radius:10px}
 </style>
 </head>
 
@@ -64,13 +50,13 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
 </div>
 
 <div class="controls">
+  <button class="btn ghost" id="btnQibla">Kiblat</button>
   <button class="btn" id="refresh">Refresh</button>
   <button class="btn ghost" id="darkBtn">Dark</button>
   <button class="btn" id="notifBtn">🔔 Notifikasi</button>
   <button class="btn ghost" id="notifToggle">OFF</button>
 </div>
 
-<!-- PILIH SOLAT -->
 <div class="selectBox" id="prayerSelect">
   <label><input type="checkbox" value="fajr"><span>Subuh</span></label>
   <label><input type="checkbox" value="dhuhr"><span>Zohor</span></label>
@@ -98,30 +84,48 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
   <source src="https://www.muslimcentral.com/wp-content/uploads/adhan.mp3" type="audio/mpeg">
 </audio>
 
+<!-- KIBLAT -->
+<div id="qiblaBox" class="card">
+<h3>🧭 Arah Kiblat</h3>
+<button id="permBtn" class="btn">Benarkan Kompas</button>
+<div id="qiblaAngle" style="font-weight:800">—</div>
+<svg width="200" height="200" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="46" fill="none" stroke="#ddd" stroke-width="2"/>
+  <line id="qiblaArrow" x1="50" y1="50" x2="50" y2="10" stroke="#F1C40F" stroke-width="5"/>
+</svg>
+<button class="btn ghost" id="btnManual">Manual</button>
+<div id="manualBox">
+  <small>Arah darjah kiblat:</small>
+  <div id="manualDegree" style="font-weight:900;color:#F1C40F">—°</div>
+</div>
+</div>
+
 <div class="footer">PWA – Labuan (WLY02)</div>
 </div>
 
 <script>
-/* ===== CONFIG ASAL ===== */
+/* ===== CONFIG ===== */
 const ZONE='WLY02';
 const API='https://api.waktusolat.app/v2/solat/';
 const ORDER=['fajr','syuruk','dhuhr','asr','maghrib','isha'];
 const NAME={fajr:'Subuh',syuruk:'Syuruk',dhuhr:'Zohor',asr:'Asar',maghrib:'Maghrib',isha:'Isyak'};
 let today,nextTs,nextKey,timerInt;
 
-/* ===== INIT ASAL ===== */
+/* ===== INIT ===== */
 init();
 refresh.onclick=init;
 darkBtn.onclick=()=>document.body.classList.toggle('dark');
+btnQibla.onclick=()=>qiblaBox.style.display=qiblaBox.style.display==='none'?'block':'none';
+btnManual.onclick=()=>manualBox.style.display=manualBox.style.display==='none'?'block':'none';
 
-/* ===== FETCH ASAL ===== */
+/* ===== FETCH ===== */
 function init(){
 fetch(API+ZONE).then(r=>r.json()).then(d=>{
 const now=new Date();
 today=d.prayers.find(p=>new Date(p.fajr*1000).getDate()===now.getDate());
 zone.innerText='Zon: '+d.zone;
 date.innerText=now.toLocaleDateString('ms-MY',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-renderList();setupCountdown();renderHijri();
+renderList();setupCountdown();renderHijri();startLocation();
 });
 }
 
@@ -136,28 +140,22 @@ list.innerHTML+=`<div class="item"><div class="prayer">${NAME[k]}</div><div>${t}
 function setupCountdown(){
 clearInterval(timerInt);
 const now=Date.now();
-for(const k of ORDER){
- if(today[k]*1000>now){nextKey=k;nextTs=today[k]*1000;break;}
-}
+for(const k of ORDER){if(today[k]*1000>now){nextKey=k;nextTs=today[k]*1000;break;}}
 if(!nextTs)return;
 
 countdown.style.display='flex';
 nextName.innerText=NAME[nextKey];
 nextTime.innerText=new Date(nextTs).toLocaleTimeString('ms-MY',{hour:'2-digit',minute:'2-digit'});
 
-if(notifEnabled && isPrayerSelected(nextKey)){
+if(notifEnabled && selectedPrayers.includes(nextKey)){
  scheduleNotification();
  scheduleAzanExact();
 }
 
 timerInt=setInterval(()=>{
- const r=nextTs-Date.now();
- if(r<=0){
-   azan.play().catch(()=>{});
-   init();
-   return;
- }
- timer.innerText=format(r);
+const r=nextTs-Date.now();
+if(r<=0){azan.play().catch(()=>{});init();return;}
+timer.innerText=format(r);
 },1000);
 }
 
@@ -176,31 +174,66 @@ hijri.innerText=j.data.hijri.date;
 }catch(e){}
 }
 
+/* ===== KIBLAT ===== */
+const KAABA_LAT=21.422487,KAABA_LON=39.826206;
+let qiblaBearing=0;
+
+function startLocation(){
+if(!navigator.geolocation)return;
+navigator.geolocation.getCurrentPosition(pos=>{
+const lat=pos.coords.latitude,lon=pos.coords.longitude;
+qiblaBearing=calcQibla(lat,lon);
+qiblaAngle.innerText=`Arah Kiblat: ${qiblaBearing.toFixed(1)}°`;
+manualDegree.innerText=`${qiblaBearing.toFixed(1)}°`;
+
+if(DeviceOrientationEvent?.requestPermission){
+ permBtn.style.display='block';
+ permBtn.onclick=()=>{
+  DeviceOrientationEvent.requestPermission().then(p=>{
+   if(p==='granted')window.addEventListener('deviceorientation',handleOrientation,true);
+  });
+ };
+}else{
+ window.addEventListener('deviceorientationabsolute',handleOrientation,true);
+}
+});
+}
+
+function handleOrientation(e){
+const compass=e.webkitCompassHeading||Math.abs(e.alpha-360);
+if(compass){
+ const rotate=qiblaBearing-compass;
+ qiblaArrow.setAttribute('transform',`rotate(${rotate} 50 50)`);
+}
+}
+
+function calcQibla(lat,lon){
+const φ1=lat*Math.PI/180,φ2=KAABA_LAT*Math.PI/180;
+const d=(KAABA_LON-lon)*Math.PI/180;
+const y=Math.sin(d);
+const x=Math.cos(φ1)*Math.tan(φ2)-Math.sin(φ1)*Math.cos(d);
+return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+
 /* ===== NOTIFICATION UPGRADE ===== */
-let notifEnabled = localStorage.getItem("notif")==="on";
+let notifEnabled=localStorage.getItem("notif")==="on";
 let notifTimeout=null;
+let selectedPrayers=JSON.parse(localStorage.getItem("prayers"))||["fajr","dhuhr","asr","maghrib","isha"];
 
-/* solat pilihan */
-let selectedPrayers = JSON.parse(localStorage.getItem("prayers")) || ["fajr","dhuhr","asr","maghrib","isha"];
-
-/* restore checkbox */
 document.querySelectorAll("#prayerSelect input").forEach(cb=>{
- cb.checked = selectedPrayers.includes(cb.value);
- cb.onchange = ()=>{
-   selectedPrayers = [...document.querySelectorAll("#prayerSelect input:checked")].map(i=>i.value);
-   localStorage.setItem("prayers",JSON.stringify(selectedPrayers));
+ cb.checked=selectedPrayers.includes(cb.value);
+ cb.onchange=()=>{
+  selectedPrayers=[...document.querySelectorAll("#prayerSelect input:checked")].map(i=>i.value);
+  localStorage.setItem("prayers",JSON.stringify(selectedPrayers));
  };
 });
 
-updateToggleUI();
-
 notifBtn.onclick=()=>{
-if(!("Notification"in window))return alert("Browser tak sokong notifikasi");
 Notification.requestPermission().then(p=>{
  if(p==="granted"){
-   notifEnabled=true;
-   localStorage.setItem("notif","on");
-   updateToggleUI();
+  notifEnabled=true;
+  localStorage.setItem("notif","on");
+  updateToggle();
  }
 });
 };
@@ -208,20 +241,14 @@ Notification.requestPermission().then(p=>{
 notifToggle.onclick=()=>{
 notifEnabled=!notifEnabled;
 localStorage.setItem("notif",notifEnabled?"on":"off");
-updateToggleUI();
+updateToggle();
 };
 
-function updateToggleUI(){
+function updateToggle(){
 notifToggle.innerText=notifEnabled?"ON":"OFF";
 notifToggle.style.background=notifEnabled?"#27ae60":"#ccc";
-notifToggle.style.color=notifEnabled?"#fff":"#000";
 }
 
-function isPrayerSelected(key){
- return selectedPrayers.includes(key);
-}
-
-/* 5 min sebelum + vibrate */
 function scheduleNotification(){
 clearTimeout(notifTimeout);
 const t=nextTs-(5*60*1000)-Date.now();
@@ -232,16 +259,14 @@ notifTimeout=setTimeout(()=>{
 },t);
 }
 
-/* Tepat azan + vibrate */
 function scheduleAzanExact(){
 const t=nextTs-Date.now();
 if(t<=0)return;
 setTimeout(()=>{
- navigator.vibrate?.([300,150,300,150,300]);
+ navigator.vibrate?.([300,150,300]);
  new Notification("🕌 Masuk Waktu Solat",{body:`Sekarang masuk waktu ${NAME[nextKey]}`});
 },t);
 }
 </script>
-
 </body>
 </html>
