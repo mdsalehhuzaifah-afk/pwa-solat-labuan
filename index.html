@@ -75,72 +75,7 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
       <div>Notifikasi Pilih</div>
     </button>
 
-    <!-- SINGLE NOTIF BUTTON (acts as ON/OFF) -->
-    <button id="notifBtn" class="off">🔔 Notifikasi</button>
-  </div>
-
-  <!-- PANEL (TERSEMBUNYI) -->
-  <div id="prayerPanel" class="prayerPanel" role="region" aria-label="Pilihan solat">
-    <div style="text-align:center;margin-bottom:8px;font-size:13px;color:#555">Pilih waktu solat untuk notifikasi</div>
-    <div class="prayerGrid" id="prayerSelect">
-      <label><input type="checkbox" value="fajr"><span>Subuh</span></label>
-      <label><input type="checkbox" value="dhuhr"><span>Zohor</span></label>
-      <label><input type="checkbox" value="asr"><span>Asar</span></label>
-      <label><input type="checkbox" value="maghrib"><span>Maghrib</span></label>
-      <label><input type="checkbox" value="isha"><span>Isyak</span></label>
-    </div>
-  </div>
-
-  <div id="zone" style="text-align:center;font-weight:bold">Menentukan lokasi…</div>
-  <div id="date" style="text-align:center;color:#666"></div>
-
-  <div class="card" id="list">
-    <div style="padding:20px;text-align:center">Sila tunggu...</div>
-  </div>
-
-  <div class="countdown" id="countdown" style="display:none">
-    <div>
-      <div id="nextName"></div>
-      <small id="nextTime"></small>
-    </div>
-    <div class="timer" id="timer">00:00:00</div>
-  </div>
-
-  <audio id="azan" preload="auto">
-    <source src="https://www.muslimcentral.com/wp-content/uploads/adhan.mp3" type="audio/mpeg">
-  </audio>
-
-  <!-- KIBLAT -->
-  <div id="qiblaBox" class="card">
-    <h3>🧭 Arah Kiblat</h3>
-    <button id="permBtn" class="btn">Benarkan Kompas</button>
-    <div id="qiblaAngle" style="font-weight:800">—</div>
-    <svg width="200" height="200" viewBox="0 0 100 100" style="margin:10px 0">
-      <circle cx="50" cy="50" r="46" fill="none" stroke="#ddd" stroke-width="2" />
-      <text x="50" y="10" text-anchor="middle" font-size="5" fill="#999">N</text>
-      <text x="90" y="52" text-anchor="middle" font-size="5" fill="#999">E</text>
-      <text x="50" y="94" text-anchor="middle" font-size="5" fill="#999">S</text>
-      <text x="10" y="52" text-anchor="middle" font-size="5" fill="#999">W</text>
-      <circle cx="50" cy="50" r="3" fill="#333" />
-      <line id="qiblaArrow" x1="50" y1="50" x2="50" y2="10" stroke="#F1C40F" stroke-width="5" stroke-linecap="round" />
-      <text x="50" y="20" text-anchor="middle" font-size="4" fill="#555" font-weight="bold">KAABAH</text>
-    </svg>
-    <div class="controls">
-      <button class="btn ghost" id="btnManual">Manual</button>
-    </div>
-    <div id="manualBox">
-      <small>Letakkan phone di atas lantai rata. Pusingkan phone sehingga kompas 0° (Utara), kemudian cari darjah di bawah:</small>
-      <div id="manualDegree" style="font-weight:900;font-size:20px;color:#F1C40F;margin-top:5px">—°</div>
-    </div>
-  </div>
-
-  <div class="footer">PWA – Labuan (WLY02)</div>
-</div>
-
-<script>
-/* ===== CONFIG ===== */
-const ZONE = 'WLY02';
-const API = 'https://api.waktusolat.app/v2/solat/';
+    <!-const API = 'https://api.waktusolat.app/v2/solat/';
 const ORDER = ['fajr','syuruk','dhuhr','asr','maghrib','isha'];
 const NAME = {fajr:'Subuh',syuruk:'Syuruk',dhuhr:'Zohor',asr:'Asar',maghrib:'Maghrib',isha:'Isyak'};
 let today=null, nextTs=null, nextKey=null, timerInt=null;
