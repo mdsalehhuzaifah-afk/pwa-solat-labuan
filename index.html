@@ -28,56 +28,27 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
 #qiblaBox{display:none;padding:14px;text-align:center}
 #manualBox{display:none;margin-top:10px;padding:10px;background:#f8f9fa;border-radius:8px}
 #permBtn{display:none;margin:10px auto;background:#e74c3c;color:white}
-#notifBtn{background:#27ae60;color:white}
+
+/* notification button states */
+#notifBtn{border-radius:12px;padding:10px 14px;border:none;cursor:pointer}
+#notifBtn.off{background:#d1d5db;color:#111} /* kelabu */
+#notifBtn.on{background:#27ae60;color:#fff}  /* hijau */
 
 /* HAMBURGER & PANEL */
-.menuBtn{
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  padding:8px 10px;
-  border-radius:10px;
-  border:none;
-  background:#eef2f7;
-  cursor:pointer;
-}
-.menuIcon{
-  width:18px;height:14px;display:inline-block;position:relative;
-}
+.menuBtn{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;border:none;background:#eef2f7;cursor:pointer}
+.menuIcon{width:18px;height:14px;display:inline-block;position:relative}
 .menuIcon span{position:absolute;height:2px;background:#333;width:100%;left:0;transition:all .25s}
 .menuIcon span:nth-child(1){top:0}
 .menuIcon span:nth-child(2){top:6px}
 .menuIcon span:nth-child(3){top:12px}
 
 /* panel that contains prayer checkboxes */
-.prayerPanel{
-  display:none;
-  margin:10px auto 0;
-  width:100%;
-  background:#fff;
-  border-radius:12px;
-  box-shadow:0 6px 18px rgba(0,0,0,.06);
-  padding:12px;
-}
-/* grid layout - 3 columns (3 baris maks 2 atau 3 per row depending) */
-.prayerGrid{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:8px;
-  align-items:center;
-  justify-items:center;
-}
-.prayerGrid label{
-  display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:#f2f6fa;width:100%;justify-content:center;cursor:pointer;
-  user-select:none;
-}
+.prayerPanel{display:none;margin:10px auto 0;width:100%;background:#fff;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.06);padding:12px}
+.prayerGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:center;justify-items:center}
+.prayerGrid label{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;background:#f2f6fa;width:100%;justify-content:center;cursor:pointer;user-select:none}
 .prayerGrid input{transform:scale(1.2);margin-right:6px}
 .prayerGrid span{font-weight:700;color:#0b6b4f}
-
-/* small helper for mobile spacing */
-@media (max-width:420px){
-  .prayerGrid{grid-template-columns:repeat(2,1fr)}
-}
+@media (max-width:420px){.prayerGrid{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 
@@ -97,7 +68,6 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
     <button class="btn" id="refresh">Refresh</button>
     <button class="btn ghost" id="darkBtn">Dark</button>
 
-    <!-- HAMBURGER: tekan untuk tunjuk panel pilihan solat -->
     <button class="menuBtn" id="menuBtn" aria-expanded="false" aria-controls="prayerPanel" title="Pilih solat untuk notifikasi">
       <div class="menuIcon" aria-hidden="true">
         <span></span><span></span><span></span>
@@ -105,8 +75,8 @@ body{margin:0;padding:16px;font-family:system-ui,Segoe UI,Roboto;background:#f4f
       <div>Notifikasi Pilih</div>
     </button>
 
-    <button class="btn" id="notifBtn">🔔 Notifikasi</button>
-    <button class="btn ghost" id="notifToggle">OFF</button>
+    <!-- SINGLE NOTIF BUTTON (acts as ON/OFF) -->
+    <button id="notifBtn" class="off">🔔 Notifikasi</button>
   </div>
 
   <!-- PANEL (TERSEMBUNYI) -->
@@ -182,6 +152,7 @@ let qiblaBearing = 0;
 /* ===== NOTIFICATION STATE ===== */
 let notifEnabled = localStorage.getItem("notif")==="on";
 let notifTimeout = null;
+let azanTimeout = null; // keep reference to exact-azan timer so we can clear
 let selectedPrayers = JSON.parse(localStorage.getItem("prayers")) || ["fajr","dhuhr","asr","maghrib","isha"];
 
 /* ===== INIT & EVENTS ===== */
@@ -205,37 +176,71 @@ menuBtn.onclick = (e) => {
   menuBtn.setAttribute('aria-expanded', String(!open));
 };
 
-/* notif buttons */
-document.getElementById('notifBtn').onclick = () => {
-  if(!('Notification' in window)){ alert("Browser tak sokong notifikasi"); return; }
+/* notification button (now single on/off toggle) */
+const notifBtn = document.getElementById('notifBtn');
+function updateNotifUI(){
+  if(notifEnabled){
+    notifBtn.classList.remove('off'); notifBtn.classList.add('on');
+    notifBtn.innerText = '🔔 Notifikasi (ON)';
+  } else {
+    notifBtn.classList.remove('on'); notifBtn.classList.add('off');
+    notifBtn.innerText = '🔔 Notifikasi (OFF)';
+  }
+}
+updateNotifUI();
+
+notifBtn.onclick = () => {
+  // If currently enabled -> turn off
+  if(notifEnabled){
+    notifEnabled = false;
+    localStorage.setItem('notif','off');
+    clearTimeout(notifTimeout);
+    if(azanTimeout) clearTimeout(azanTimeout);
+    updateNotifUI();
+    alert('Notifikasi dimatikan');
+    return;
+  }
+
+  // If currently disabled -> try to enable (ask permission if needed)
+  if(!('Notification' in window)){
+    alert('Browser tidak sokong notifikasi');
+    return;
+  }
+
+  if(Notification.permission === 'granted'){
+    notifEnabled = true;
+    localStorage.setItem('notif','on');
+    updateNotifUI();
+    // schedule if next prayer is selected
+    if(nextTs && selectedPrayers.includes(nextKey)){
+      scheduleNotification();
+      scheduleAzanExact();
+    }
+    alert('Notifikasi dihidupkan');
+    return;
+  }
+
+  if(Notification.permission === 'denied'){
+    alert('Notifikasi telah disekat pada browser. Sila benarkan pada tetapan browser.');
+    return;
+  }
+
+  // request permission
   Notification.requestPermission().then(p => {
     if(p === 'granted'){
       notifEnabled = true;
       localStorage.setItem('notif','on');
-      updateToggleUI();
-      // schedule immediately if there's a next prayer suitable
-      if(nextTs && selectedPrayers.includes(nextKey)) {
+      updateNotifUI();
+      if(nextTs && selectedPrayers.includes(nextKey)){
         scheduleNotification();
         scheduleAzanExact();
       }
-      alert('Notifikasi dihidupkan ✅');
+      alert('Notifikasi dihidupkan');
+    } else {
+      alert('Izin notifikasi tidak diberikan');
     }
-  }).catch(()=>{});
+  }).catch(()=>{ alert('Gagal meminta izin notifikasi'); });
 };
-
-document.getElementById('notifToggle').onclick = () => {
-  notifEnabled = !notifEnabled;
-  localStorage.setItem('notif', notifEnabled ? 'on' : 'off');
-  updateToggleUI();
-  if(!notifEnabled) clearTimeout(notifTimeout);
-};
-
-function updateToggleUI(){
-  const t = document.getElementById('notifToggle');
-  t.innerText = notifEnabled ? 'ON' : 'OFF';
-  t.style.background = notifEnabled ? '#27ae60' : '#ccc';
-  t.style.color = notifEnabled ? '#fff' : '#000';
-}
 
 /* restore prayer checkboxes and wire them */
 document.querySelectorAll("#prayerSelect input").forEach(cb => {
@@ -243,9 +248,10 @@ document.querySelectorAll("#prayerSelect input").forEach(cb => {
   cb.onchange = () => {
     selectedPrayers = [...document.querySelectorAll("#prayerSelect input:checked")].map(i => i.value);
     localStorage.setItem('prayers', JSON.stringify(selectedPrayers));
-    // if user toggles selection and there's an upcoming prayer, reschedule
-    if(nextTs) {
+    // reschedule if necessary
+    if(nextTs){
       clearTimeout(notifTimeout);
+      if(azanTimeout) clearTimeout(azanTimeout);
       if(notifEnabled && selectedPrayers.includes(nextKey)){
         scheduleNotification();
         scheduleAzanExact();
@@ -253,8 +259,6 @@ document.querySelectorAll("#prayerSelect input").forEach(cb => {
     }
   };
 });
-
-updateToggleUI();
 
 /* ===== FUNCTIONS: FETCH & RENDER ===== */
 function init(){
@@ -316,6 +320,10 @@ function setupCountdown(){
   document.getElementById('nextTime').innerText = new Date(nextTs).toLocaleTimeString('ms-MY', {hour:'2-digit', minute:'2-digit'});
 
   // schedule only if notif enabled and this prayer selected
+  // clear previous timers first
+  clearTimeout(notifTimeout);
+  if(azanTimeout) clearTimeout(azanTimeout);
+
   if(notifEnabled && selectedPrayers.includes(nextKey)){
     scheduleNotification();
     scheduleAzanExact();
@@ -429,7 +437,7 @@ function scheduleAzanExact(){
   if(!nextTs) return;
   const t = nextTs - Date.now();
   if(t <= 0) return;
-  setTimeout(() => {
+  azanTimeout = setTimeout(() => {
     try{ navigator.vibrate?.([300,150,300]); }catch(e){}
     new Notification("🕌 Masuk Waktu Solat", {
       body: `Sekarang masuk waktu ${NAME[nextKey]}`,
@@ -437,6 +445,9 @@ function scheduleAzanExact(){
     });
   }, t);
 }
+
+/* ensure UI matches stored state on load */
+updateNotifUI();
 </script>
 </body>
-</html>
+  </html>
