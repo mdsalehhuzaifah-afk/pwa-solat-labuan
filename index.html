@@ -150,12 +150,10 @@ let today = null, nextTs = null, nextKey = null, timerInt = null;
 const KAABA_LAT = 21.422487, KAABA_LON = 39.826206;
 let qiblaBearing = 0;
 
-/* ===== NOTIFICATION STATE (with polling helpers) ===== */
+/* ===== NOTIFICATION STATE ===== */
 let notifEnabled = localStorage.getItem("notif") === "on";
 let notifTimeout = null;
 let azanTimeout = null;
-let azanPoll = null;
-let azanFired = false;
 let selectedPrayers = JSON.parse(localStorage.getItem("prayers")) || ["fajr","dhuhr","asr","maghrib","isha"];
 
 /* ===== INIT & EVENTS ===== */
@@ -187,7 +185,8 @@ notifBtn.onclick = () => {
     // turn off
     notifEnabled = false;
     localStorage.setItem('notif','off');
-    clearAllNotif();
+    clearTimeout(notifTimeout);
+    if(azanTimeout) clearTimeout(azanTimeout);
     updateNotifUI();
     alert('Notifikasi dimatikan');
     return;
@@ -199,7 +198,6 @@ notifBtn.onclick = () => {
     notifEnabled = true;
     localStorage.setItem('notif','on');
     updateNotifUI();
-    // schedule for next prayer if applicable
     if(nextTs && selectedPrayers.includes(nextKey)){
       scheduleBefore();
       scheduleExact();
@@ -235,9 +233,10 @@ document.querySelectorAll("#prayerSelect input").forEach(cb => {
   cb.onchange = () => {
     selectedPrayers = [...document.querySelectorAll("#prayerSelect input:checked")].map(i => i.value);
     localStorage.setItem('prayers', JSON.stringify(selectedPrayers));
-    // if there's a next prayer, reschedule notifications accordingly
+    // reschedule if necessary
     if(nextTs){
-      clearAllNotif();
+      clearTimeout(notifTimeout);
+      if(azanTimeout) clearTimeout(azanTimeout);
       if(notifEnabled && selectedPrayers.includes(nextKey)){
         scheduleBefore();
         scheduleExact();
@@ -252,7 +251,6 @@ function init(){
     .then(r => r.json())
     .then(d => {
       const now = new Date();
-      // find the object for today correctly
       today = d.prayers.find(p => {
         const pDate = new Date(p.fajr * 1000);
         return pDate.getDate() === now.getDate() &&
@@ -260,7 +258,6 @@ function init(){
                pDate.getFullYear() === now.getFullYear();
       });
 
-      // fallback: if not found, use first item (prevent break)
       if(!today) today = d.prayers[0] || null;
 
       if(!today){
@@ -274,7 +271,6 @@ function init(){
       renderList();
       setupCountdown();
       renderHijri();
-      // start qibla location (so manual degree gets shown)
       startLocation();
     })
     .catch((err) => {
@@ -294,8 +290,9 @@ function renderList(){
 
 function setupCountdown(){
   clearInterval(timerInt);
-  // clear previous notif timers & polling
-  clearAllNotif();
+  // clear previous notif timers
+  clearTimeout(notifTimeout);
+  if(azanTimeout) clearTimeout(azanTimeout);
 
   const now = Date.now();
   nextTs = null;
@@ -309,17 +306,14 @@ function setupCountdown(){
   }
 
   if(!nextTs){
-    // no next prayer today
     document.getElementById('countdown').style.display = 'none';
     return;
   }
 
-  // show countdown
   document.getElementById('countdown').style.display = 'flex';
   document.getElementById('nextName').innerText = NAME[nextKey];
   document.getElementById('nextTime').innerText = new Date(nextTs).toLocaleTimeString('ms-MY', {hour:'2-digit', minute:'2-digit'});
 
-  // schedule notification(s) if enabled and selected
   if(notifEnabled && selectedPrayers.includes(nextKey)){
     scheduleBefore();
     scheduleExact();
@@ -328,10 +322,8 @@ function setupCountdown(){
   timerInt = setInterval(() => {
     const r = nextTs - Date.now();
     if(r <= 0){
-      // play azan (if possible) and refresh data
       try{ document.getElementById('azan').play().catch(()=>{}); }catch(e){}
       clearInterval(timerInt);
-      // small delay to ensure transition
       setTimeout(()=> init(), 500);
       return;
     }
@@ -417,84 +409,35 @@ async function renderHijri(){
   }catch(e){}
 }
 
-/* ===== NOTIFICATION ENGINE (5 min before + exact with polling) ===== */
+/* ===== NOTIFICATION (RESTORED SIMPLE VERSION) ===== */
 
-function clearAllNotif(){
-  if(notifTimeout) { clearTimeout(notifTimeout); notifTimeout = null; }
-  if(azanTimeout) { clearTimeout(azanTimeout); azanTimeout = null; }
-  if(azanPoll) { clearInterval(azanPoll); azanPoll = null; }
-  azanFired = false;
-}
-
-// 5 minutes before
+/* 5 minutes before (simple setTimeout) */
 function scheduleBefore(){
-  clearAllNotif(); // ensure fresh
+  clearTimeout(notifTimeout);
   if(!nextTs) return;
-  const ms = nextTs - Date.now() - (5 * 60 * 1000);
-  if(ms <= 0) return;
+  const t = nextTs - (5 * 60 * 1000) - Date.now();
+  if(t <= 0) return;
   notifTimeout = setTimeout(() => {
     try{ navigator.vibrate?.([200,100,200]); }catch(e){}
     if(Notification.permission === 'granted' && notifEnabled && selectedPrayers.includes(nextKey)){
       new Notification("Waktu Solat Hampir", { body: `${NAME[nextKey]} 5 minit lagi` });
     }
-  }, ms);
+  }, t);
 }
 
-// function that fires the exact-time notification (guarded)
-function fireAzanNotification(){
-  if(azanFired) return;
-  azanFired = true;
-  try{ navigator.vibrate?.([300,150,300]); }catch(e){}
-  if(Notification.permission === 'granted' && notifEnabled && selectedPrayers.includes(nextKey)){
-    new Notification("🕌 Masuk Waktu Solat", { body: `Sekarang masuk waktu ${NAME[nextKey]}` });
-  }
-  try{ document.getElementById('azan').play().catch(()=>{}); }catch(e){}
-}
-
-// schedule exact with both timeout and short polling to avoid throttle
+/* exact azan time (simple setTimeout) */
 function scheduleExact(){
   if(!nextTs) return;
-  clearAllNotif();
-
+  if(azanTimeout) clearTimeout(azanTimeout);
   const t = nextTs - Date.now();
-  if(t <= 0){
-    fireAzanNotification();
-    return;
-  }
-
-  // long timeout
+  if(t <= 0) return;
   azanTimeout = setTimeout(() => {
-    fireAzanNotification();
-    if(azanPoll){ clearInterval(azanPoll); azanPoll = null; }
-    azanTimeout = null;
+    try{ navigator.vibrate?.([300,150,300]); }catch(e){}
+    if(Notification.permission === 'granted' && notifEnabled && selectedPrayers.includes(nextKey)){
+      new Notification("🕌 Masuk Waktu Solat", { body: `Sekarang masuk waktu ${NAME[nextKey]}` });
+    }
+    try{ document.getElementById('azan').play().catch(()=>{}); }catch(e){}
   }, t);
-
-  // start polling 30s before to catch throttled cases
-  const POLL_BEFORE_MS = 30 * 1000;
-  const pollStart = t - POLL_BEFORE_MS;
-
-  if(pollStart > 0){
-    setTimeout(() => {
-      if(azanPoll) clearInterval(azanPoll);
-      azanPoll = setInterval(() => {
-        if(Date.now() >= nextTs){
-          clearInterval(azanPoll); azanPoll = null;
-          if(azanTimeout){ clearTimeout(azanTimeout); azanTimeout = null; }
-          fireAzanNotification();
-        }
-      }, 1000);
-    }, pollStart);
-  } else {
-    // already within 30s
-    if(azanPoll) clearInterval(azanPoll);
-    azanPoll = setInterval(() => {
-      if(Date.now() >= nextTs){
-        clearInterval(azanPoll); azanPoll = null;
-        if(azanTimeout){ clearTimeout(azanTimeout); azanTimeout = null; }
-        fireAzanNotification();
-      }
-    }, 1000);
-  }
 }
 
 /* ensure UI matches stored state on load */
@@ -502,4 +445,4 @@ updateNotifUI();
 
 </script>
 </body>
-</html>
+  </html>
