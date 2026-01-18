@@ -4,6 +4,12 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Waktu Solat Labuan</title>
+
+<!-- ADDED: manifest, theme color and favicon (use ./ because repo di subfolder) -->
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0F172A">
+<link rel="icon" href="./icon-192.png">
+
 <style>
 :root{--accent:#F1C40F}
 *{box-sizing:border-box}
@@ -399,6 +405,15 @@ function scheduleExact(){
 
 /* ensure UI shows stored state */
 updateNotifUI();
+</script>
+
+<!-- ADDED: register service worker (use ./sw.js for GitHub Pages subfolder) -->
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js')
+    .then(reg => console.log('ServiceWorker registered:', reg.scope))
+    .catch(err => console.error('SW register failed:', err));
+}
 </script>
 </body>
 </html>
